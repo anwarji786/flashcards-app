@@ -4,8 +4,7 @@ from docx import Document
 import re
 
 # 📂 Path to your text document
-doc_path = r"D:\Compare B2B\Flash Card\Flash Card Text.docx"
-
+doc_path = "Flash Card Text.docx"
 # 📖 Load text from Word document
 def load_flashcards(doc_path):
     doc = Document(doc_path)
@@ -101,3 +100,4 @@ if __name__ == "__main__":
         st.info("Update the `doc_path` variable with the correct path.")
     except Exception as e:
         st.error(f"❌ Error: {e}")
+        
