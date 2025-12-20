@@ -127,7 +127,8 @@ def show_flashcards(flashcards, reverse=False):
             
             if not reverse:
                 # English → Arabic mode
-                st.markdown(f"### 🔹 **{english}**")
+                # English text in RED
+                st.markdown(f'<h3 style="color:#FF0000;">🔹 <strong>{english}</strong></h3>', unsafe_allow_html=True)
                 
                 # English voice controls
                 current_audio_id = f"card_{i}_en"
@@ -165,9 +166,10 @@ def show_flashcards(flashcards, reverse=False):
                         st.success("🔁 Playing English audio on loop...")
                 
                 if st.checkbox("Show Arabic & Transliteration", key=f"en_ar_{i}"):
+                    # Arabic text in RED
                     st.markdown(
                         f"""
-                        <div style='text-align:right; direction:rtl; font-size:32px; color:#008000; font-weight:bold; margin-top:15px;'>{arabic}</div>
+                        <div style='text-align:right; direction:rtl; font-size:32px; color:#FF0000; font-weight:bold; margin-top:15px;'>{arabic}</div>
                         <div style='text-align:left; font-size:18px; font-style:italic; color:#555; margin-top:10px;'>Transliteration: {translit}</div>
                         """,
                         unsafe_allow_html=True
@@ -209,8 +211,9 @@ def show_flashcards(flashcards, reverse=False):
             
             else:
                 # Arabic → English mode
+                # Arabic text in RED
                 st.markdown(
-                    f"<div style='text-align:right; direction:rtl; font-size:32px; color:#000080; font-weight:bold;'>{arabic}</div>",
+                    f"<div style='text-align:right; direction:rtl; font-size:32px; color:#FF0000; font-weight:bold;'>{arabic}</div>",
                     unsafe_allow_html=True
                 )
                 
@@ -249,9 +252,10 @@ def show_flashcards(flashcards, reverse=False):
                         st.success("🔁 Playing Arabic audio on loop...")
                 
                 if st.checkbox("Show English & Transliteration", key=f"ar_en_{i}"):
+                    # English text in RED
                     st.markdown(
                         f"""
-                        <div style='text-align:left; font-size:28px; color:#008000; font-weight:bold; margin-top:15px;'>{english}</div>
+                        <div style='text-align:left; font-size:28px; color:#FF0000; font-weight:bold; margin-top:15px;'>{english}</div>
                         <div style='text-align:left; font-size:18px; font-style:italic; color:#555; margin-top:10px;'>Transliteration: {translit}</div>
                         """,
                         unsafe_allow_html=True
@@ -316,7 +320,7 @@ if __name__ == "__main__":
             # Preview first parsed card
             with st.expander("🔍 Preview first card with voice"):
                 en, ar, tr = flashcards[0]
-                st.text(f"English (display): {en}")
+                st.markdown(f'<span style="color:#FF0000; font-weight:bold;">English (display): {en}</span>', unsafe_allow_html=True)
                 st.text(f"English (for voice): {remove_emojis(en)}")
                 
                 # Preview English audio with loop
@@ -350,7 +354,7 @@ if __name__ == "__main__":
                         st.markdown(audio_html, unsafe_allow_html=True)
                         st.success("🔁 Playing English preview on loop...")
                 
-                st.text(f"Arabic (display): {ar}")
+                st.markdown(f'<div style="text-align:right; direction:rtl; color:#FF0000; font-weight:bold;">Arabic (display): {ar}</div>', unsafe_allow_html=True)
                 st.text(f"Arabic (for voice): {remove_emojis(ar)}")
                 
                 # Preview Arabic audio with loop
