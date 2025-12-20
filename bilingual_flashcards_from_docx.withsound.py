@@ -5,9 +5,16 @@ from docx import Document
 import re
 from gtts import gTTS
 import io
+import time
 
 # 📂 Path to your text document
 doc_path = "Flash Card Text.docx"
+
+# Session state for audio control
+if 'audio_playing' not in st.session_state:
+    st.session_state.audio_playing = None  # Store which audio is currently playing (card_index_lang)
+if 'stop_requested' not in st.session_state:
+    st.session_state.stop_requested = False
 
 # 📖 Load text from Word document
 def load_flashcards(doc_path):
@@ -87,15 +94,32 @@ def text_to_speech(text, lang="en"):
         audio_bytes = io.BytesIO()
         tts.write_to_fp(audio_bytes)
         audio_bytes.seek(0)
-        return audio_bytes
+        return audio_bytes.getvalue()
     except Exception as e:
         st.error(f"Error generating audio: {e}")
         return None
+
+# ⏹️ Stop audio function
+def stop_audio():
+    """Stop currently playing audio"""
+    st.session_state.stop_requested = True
+    st.session_state.audio_playing = None
+    st.rerun()
 
 # 🎴 Display flashcards with voiceover
 def show_flashcards(flashcards, reverse=False):
     st.title("📚 Bilingual Flashcards with Voiceover")
     st.write("🔹 Check the box below each card to reveal the translation and play sound.")
+    st.write("🔁 Audio will loop until you click the Stop button.")
+    
+    # Global stop button in sidebar
+    with st.sidebar:
+        if st.session_state.audio_playing:
+            st.warning(f"🔊 Currently playing: {st.session_state.audio_playing}")
+            if st.button("⏹️ Stop All Audio", type="primary", use_container_width=True):
+                stop_audio()
+        else:
+            st.info("No audio currently playing")
     
     for i, (english, arabic, translit) in enumerate(flashcards):
         with st.container():
@@ -105,21 +129,40 @@ def show_flashcards(flashcards, reverse=False):
                 # English → Arabic mode
                 st.markdown(f"### 🔹 **{english}**")
                 
-                # English voice button
-                col1, col2 = st.columns([1, 4])
+                # English voice controls
+                current_audio_id = f"card_{i}_en"
+                is_playing = st.session_state.audio_playing == current_audio_id
+                
+                col1, col2 = st.columns([1, 1])
                 with col1:
                     voice_key = f"en_voice_{i}"
-                    if st.button(f"🔊 English", key=voice_key):
+                    if st.button(f"🔊 Play English", key=voice_key, disabled=is_playing):
+                        # Generate and store audio
                         audio_bytes = text_to_speech(english, lang="en")
                         if audio_bytes:
-                            # Create a unique audio player for each button
-                            audio_html = f"""
-                            <audio autoplay="true" style="display:none;">
-                            <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes.read()).decode()}" type="audio/mp3">
-                            </audio>
-                            """
-                            st.markdown(audio_html, unsafe_allow_html=True)
-                            st.success("Playing English audio...")
+                            st.session_state[f"audio_{current_audio_id}"] = audio_bytes
+                            st.session_state.audio_playing = current_audio_id
+                            st.session_state.stop_requested = False
+                            st.rerun()
+                
+                with col2:
+                    if is_playing:
+                        if st.button(f"⏹️ Stop", key=f"stop_en_{i}", type="secondary"):
+                            stop_audio()
+                
+                # Show looping audio player if this audio is playing
+                if is_playing and not st.session_state.stop_requested:
+                    audio_bytes = st.session_state.get(f"audio_{current_audio_id}")
+                    if audio_bytes:
+                        # Create looping audio player
+                        audio_html = f"""
+                        <audio autoplay loop style="display:none;">
+                        <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                        Your browser does not support the audio element.
+                        </audio>
+                        """
+                        st.markdown(audio_html, unsafe_allow_html=True)
+                        st.success("🔁 Playing English audio on loop...")
                 
                 if st.checkbox("Show Arabic & Transliteration", key=f"en_ar_{i}"):
                     st.markdown(
@@ -130,21 +173,39 @@ def show_flashcards(flashcards, reverse=False):
                         unsafe_allow_html=True
                     )
                     
-                    # Arabic voice button
-                    col1, col2 = st.columns([1, 4])
+                    # Arabic voice controls
+                    current_audio_id_ar = f"card_{i}_ar"
+                    is_playing_ar = st.session_state.audio_playing == current_audio_id_ar
+                    
+                    col1, col2 = st.columns([1, 1])
                     with col1:
                         voice_key = f"ar_voice_{i}"
-                        if st.button(f"🔊 Arabic", key=voice_key):
+                        if st.button(f"🔊 Play Arabic", key=voice_key, disabled=is_playing_ar):
                             audio_bytes = text_to_speech(arabic, lang="ar")
                             if audio_bytes:
-                                # Create a unique audio player for each button
-                                audio_html = f"""
-                                <audio autoplay="true" style="display:none;">
-                                <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes.read()).decode()}" type="audio/mp3">
-                                </audio>
-                                """
-                                st.markdown(audio_html, unsafe_allow_html=True)
-                                st.success("Playing Arabic audio...")
+                                st.session_state[f"audio_{current_audio_id_ar}"] = audio_bytes
+                                st.session_state.audio_playing = current_audio_id_ar
+                                st.session_state.stop_requested = False
+                                st.rerun()
+                    
+                    with col2:
+                        if is_playing_ar:
+                            if st.button(f"⏹️ Stop", key=f"stop_ar_{i}", type="secondary"):
+                                stop_audio()
+                    
+                    # Show looping audio player if Arabic audio is playing
+                    if is_playing_ar and not st.session_state.stop_requested:
+                        audio_bytes = st.session_state.get(f"audio_{current_audio_id_ar}")
+                        if audio_bytes:
+                            # Create looping audio player
+                            audio_html = f"""
+                            <audio autoplay loop style="display:none;">
+                            <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                            Your browser does not support the audio element.
+                            </audio>
+                            """
+                            st.markdown(audio_html, unsafe_allow_html=True)
+                            st.success("🔁 Playing Arabic audio on loop...")
             
             else:
                 # Arabic → English mode
@@ -153,21 +214,39 @@ def show_flashcards(flashcards, reverse=False):
                     unsafe_allow_html=True
                 )
                 
-                # Arabic voice button
-                col1, col2 = st.columns([1, 4])
+                # Arabic voice controls (first)
+                current_audio_id = f"card_{i}_ar_first"
+                is_playing = st.session_state.audio_playing == current_audio_id
+                
+                col1, col2 = st.columns([1, 1])
                 with col1:
                     voice_key = f"ar_voice_first_{i}"
-                    if st.button(f"🔊 Arabic", key=voice_key):
+                    if st.button(f"🔊 Play Arabic", key=voice_key, disabled=is_playing):
                         audio_bytes = text_to_speech(arabic, lang="ar")
                         if audio_bytes:
-                            # Create a unique audio player for each button
-                            audio_html = f"""
-                            <audio autoplay="true" style="display:none;">
-                            <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes.read()).decode()}" type="audio/mp3">
-                            </audio>
-                            """
-                            st.markdown(audio_html, unsafe_allow_html=True)
-                            st.success("Playing Arabic audio...")
+                            st.session_state[f"audio_{current_audio_id}"] = audio_bytes
+                            st.session_state.audio_playing = current_audio_id
+                            st.session_state.stop_requested = False
+                            st.rerun()
+                
+                with col2:
+                    if is_playing:
+                        if st.button(f"⏹️ Stop", key=f"stop_ar_first_{i}", type="secondary"):
+                            stop_audio()
+                
+                # Show looping audio player if this audio is playing
+                if is_playing and not st.session_state.stop_requested:
+                    audio_bytes = st.session_state.get(f"audio_{current_audio_id}")
+                    if audio_bytes:
+                        # Create looping audio player
+                        audio_html = f"""
+                        <audio autoplay loop style="display:none;">
+                        <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                        Your browser does not support the audio element.
+                        </audio>
+                        """
+                        st.markdown(audio_html, unsafe_allow_html=True)
+                        st.success("🔁 Playing Arabic audio on loop...")
                 
                 if st.checkbox("Show English & Transliteration", key=f"ar_en_{i}"):
                     st.markdown(
@@ -178,21 +257,39 @@ def show_flashcards(flashcards, reverse=False):
                         unsafe_allow_html=True
                     )
                     
-                    # English voice button
-                    col1, col2 = st.columns([1, 4])
+                    # English voice controls (second)
+                    current_audio_id_en = f"card_{i}_en_second"
+                    is_playing_en = st.session_state.audio_playing == current_audio_id_en
+                    
+                    col1, col2 = st.columns([1, 1])
                     with col1:
                         voice_key = f"en_voice_second_{i}"
-                        if st.button(f"🔊 English", key=voice_key):
+                        if st.button(f"🔊 Play English", key=voice_key, disabled=is_playing_en):
                             audio_bytes = text_to_speech(english, lang="en")
                             if audio_bytes:
-                                # Create a unique audio player for each button
-                                audio_html = f"""
-                                <audio autoplay="true" style="display:none;">
-                                <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes.read()).decode()}" type="audio/mp3">
-                                </audio>
-                                """
-                                st.markdown(audio_html, unsafe_allow_html=True)
-                                st.success("Playing English audio...")
+                                st.session_state[f"audio_{current_audio_id_en}"] = audio_bytes
+                                st.session_state.audio_playing = current_audio_id_en
+                                st.session_state.stop_requested = False
+                                st.rerun()
+                    
+                    with col2:
+                        if is_playing_en:
+                            if st.button(f"⏹️ Stop", key=f"stop_en_second_{i}", type="secondary"):
+                                stop_audio()
+                    
+                    # Show looping audio player if English audio is playing
+                    if is_playing_en and not st.session_state.stop_requested:
+                        audio_bytes = st.session_state.get(f"audio_{current_audio_id_en}")
+                        if audio_bytes:
+                            # Create looping audio player
+                            audio_html = f"""
+                            <audio autoplay loop style="display:none;">
+                            <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                            Your browser does not support the audio element.
+                            </audio>
+                            """
+                            st.markdown(audio_html, unsafe_allow_html=True)
+                            st.success("🔁 Playing English audio on loop...")
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -210,6 +307,7 @@ if __name__ == "__main__":
             with st.expander("⚙️ Voice Settings"):
                 st.info("Note: Voice synthesis uses Google Text-to-Speech (gTTS)")
                 st.write("✅ Emojis are automatically removed from voice output")
+                st.write("🔁 Audio loops continuously until Stop button is clicked")
                 st.write("Example: 'Hello 👋' will speak as 'Hello'")
                 st.write("English voice: Standard English TTS")
                 st.write("Arabic voice: Standard Arabic TTS")
@@ -221,21 +319,70 @@ if __name__ == "__main__":
                 st.text(f"English (display): {en}")
                 st.text(f"English (for voice): {remove_emojis(en)}")
                 
-                col1, col2 = st.columns(2)
+                # Preview English audio with loop
+                preview_audio_id = "preview_en"
+                is_preview_playing = st.session_state.audio_playing == preview_audio_id
+                
+                col1, col2 = st.columns([1, 1])
                 with col1:
-                    if st.button("🔊 Play English", key="preview_en"):
+                    if st.button("🔊 Play English", key="preview_en", disabled=is_preview_playing):
                         audio_bytes = text_to_speech(en, lang="en")
                         if audio_bytes:
-                            st.audio(audio_bytes, format="audio/mp3")
+                            st.session_state[f"audio_{preview_audio_id}"] = audio_bytes
+                            st.session_state.audio_playing = preview_audio_id
+                            st.session_state.stop_requested = False
+                            st.rerun()
+                
+                with col2:
+                    if is_preview_playing:
+                        if st.button("⏹️ Stop", key="stop_preview_en", type="secondary"):
+                            stop_audio()
+                
+                # Show looping audio player for preview
+                if is_preview_playing and not st.session_state.stop_requested:
+                    audio_bytes = st.session_state.get(f"audio_{preview_audio_id}")
+                    if audio_bytes:
+                        audio_html = f"""
+                        <audio autoplay loop style="display:none;">
+                        <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                        </audio>
+                        """
+                        st.markdown(audio_html, unsafe_allow_html=True)
+                        st.success("🔁 Playing English preview on loop...")
                 
                 st.text(f"Arabic (display): {ar}")
                 st.text(f"Arabic (for voice): {remove_emojis(ar)}")
                 
-                with col2:
-                    if st.button("🔊 Play Arabic", key="preview_ar"):
+                # Preview Arabic audio with loop
+                preview_audio_id_ar = "preview_ar"
+                is_preview_playing_ar = st.session_state.audio_playing == preview_audio_id_ar
+                
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    if st.button("🔊 Play Arabic", key="preview_ar", disabled=is_preview_playing_ar):
                         audio_bytes = text_to_speech(ar, lang="ar")
                         if audio_bytes:
-                            st.audio(audio_bytes, format="audio/mp3")
+                            st.session_state[f"audio_{preview_audio_id_ar}"] = audio_bytes
+                            st.session_state.audio_playing = preview_audio_id_ar
+                            st.session_state.stop_requested = False
+                            st.rerun()
+                
+                with col2:
+                    if is_preview_playing_ar:
+                        if st.button("⏹️ Stop", key="stop_preview_ar", type="secondary"):
+                            stop_audio()
+                
+                # Show looping audio player for Arabic preview
+                if is_preview_playing_ar and not st.session_state.stop_requested:
+                    audio_bytes = st.session_state.get(f"audio_{preview_audio_id_ar}")
+                    if audio_bytes:
+                        audio_html = f"""
+                        <audio autoplay loop style="display:none;">
+                        <source src="data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode()}" type="audio/mp3">
+                        </audio>
+                        """
+                        st.markdown(audio_html, unsafe_allow_html=True)
+                        st.success("🔁 Playing Arabic preview on loop...")
                 
                 st.text(f"Transliteration: {tr}")
         
